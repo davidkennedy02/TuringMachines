@@ -1,0 +1,289 @@
+#!/usr/bin/python3
+
+from io import TextIOWrapper
+import sys
+from itertools import repeat
+
+"""
+The main function, used to read the TM's information and begin simulation
+"""
+def main():
+
+    try: 
+        # Reading the TM description file 
+        states, initialState, alphabet, transitionDict = readTMFile(sys.argv[1])
+
+        # If there is a tape file, read it...
+        if (len(sys.argv) > 2):
+            tape = readTape(sys.argv[2], alphabet)
+
+        # If not, initialise a tape with 100 empty spaces
+        else: 
+            tape = []
+            tape.extend(repeat("_", 100)) 
+        
+        # Simulate the TM with the information given
+        simulateTM(states, initialState, transitionDict, tape)
+
+    except Exception as e:
+        print(e)
+        sys.exit(1)
+
+"""
+This function reads the TM description file, and is split into three 
+sub-functions: checkStates, readAlphabet, and checkTransitions. 
+"""
+def readTMFile(tmDescFile: str) -> tuple[set, str, set, dict]:
+
+    # For debugging purposes 
+    print(" Reading TM description file")
+    try:
+        # Attempt to open the TM description file 
+        f = open(tmDescFile, "r")
+
+        # Records the initial state of the TM, as well as 
+        # each possible state the TM can enter
+        states, initialState = checkStates(f)
+
+        # Records the alphabet as a list 
+        alphabet = readAlphabet(f)
+
+        # Records all transitions as tuple keys and values in 
+        # a dictionary for fast access. 
+        transitionDict = checkTransitions(f, states, alphabet)
+        
+        # Close file 
+        f.close()
+
+        # Returns discovered information to main function
+        return (states, initialState, alphabet, transitionDict)
+
+    # In case of IO error such as file not existing / not being able to be read
+    except IOError as e:
+        # print(" " + e)
+        sys.exit(3)
+
+    # Invalid formatting of information within TM description file 
+    except: 
+        print("input error")
+        sys.exit(2)
+
+
+"""
+This function ensures each state name posesses a valid name, as 
+well as there being exactly one accept and reject state. It also takes note of the 
+initial state, as states are stored in a set which is not indexable
+"""
+def checkStates(f:TextIOWrapper) -> tuple[set, str]:
+
+    # Set to allow fast access 
+    states = set()
+    initialState = ""
+    invalidStateNames = {"+", "-", "alphabet"}
+
+    # Taking the number of states from the description file 
+    numStates = int(f.readline().split()[1])
+
+    # Adding each state and their corresponding action to a set;
+    # states that do not accept nor reject are indicated by an underscore
+    for i in range(numStates):
+        state = f.readline().split()
+
+        # Setting the intial state 
+        if i == 0:
+            initialState = state[0]
+
+        # i.e., if the state is accepting or rejecting 
+        if len(state) > 1:
+            states.add((state[0], state[1]))
+        else :
+            states.add((state[0], "_"))
+
+    # Debugging purposes 
+    # print(" State tuples: ", states)
+
+    # Check for invalid state names 
+    assert(not any(name in [state[0] for state in states] for name in invalidStateNames))
+
+    # Check there is only one accept and reject state
+    assert([state[1] for state in states].count("+") == 1)
+    assert([state[1] for state in states].count("-") == 1)
+
+    # Check that TM does not initialise in the reject or accept state 
+    assert((initialState, "_") in states)
+
+    return states, initialState
+
+
+"""
+This function reads the TM's alphabet and stores each possible 
+character in a list. 
+"""
+def readAlphabet(f:TextIOWrapper) -> set:
+    # Read in alphabet
+    alphabet = f.readline().split()
+
+    # Check length of alphabet is correct
+    assert((len(alphabet) - 2) == int(alphabet[1]))
+    assert(int(alphabet[1]) > 0)
+
+    # Remove 'alphabet' and its length from alphabet
+    alphabet = alphabet[2:]
+    # print(" Alphabet: ", alphabet)
+
+    return set(alphabet)
+
+
+"""
+checkTransitions performs many checks to ensure each transition listed in 
+the TM description file is valid. Once a transition is validated, it is then 
+added to a dictionary as a key value pair, to allow fast access. 
+"""
+def checkTransitions(f:TextIOWrapper, states: set, alphabet: set) -> dict:
+    transitionDict = {}
+    validMoves = {"L", "R", "N"}
+
+    # Reaffirming data types
+    states = set(states)
+    alphabet = set(alphabet)
+
+    # contains only states, no status 
+    refinedStates = set([state[0] for state in states])
+
+    # For all remaining lines in the description file 
+    while transition := f.readline():
+        transition = transition.split()
+
+        # Skips past empty lines at end of file
+        if len(transition) == 0:
+            continue
+
+        assert(len(transition) == 5)
+
+        # Check <state1>
+        assert(transition[0] in refinedStates)
+        assert(((transition[0], "+") and (transition[0], "-")) not in states)
+
+        # Check <tapeinput>
+        assert((transition[1] in alphabet) or (transition[1] == "_"))
+
+        # Check <state2>
+        assert(transition[2] in refinedStates)
+
+        # Check <tapeoutput>
+        assert((transition[3] in alphabet) or (transition[3] == "_"))
+
+        # Check <move>
+        assert (transition[4] in validMoves)
+
+        # Check for duplicate transitions 
+        assert((transition[0], transition[1]) not in transitionDict.keys())
+
+        transitionDict.update({(transition[0], transition[1]) : (transition[2], transition[3], transition[4])})
+
+    return transitionDict
+
+
+"""
+This function allows the tape file to be read, provided there is one given. 
+"""
+def readTape(tapeFile:str, alphabet:set) -> list[str]:
+    try:
+
+        # Conversion to set to allow faster checking 
+        alphabet = set(alphabet)
+
+        # Open the file containing the tape
+        f = open(tapeFile, "r")
+
+        # Read the entire file into a string
+        tape = f.read()
+
+        # Remove new line chars and spaces
+        tape = tape.replace("\n", "").replace(" ", "")
+
+        # Convert each character in the tape into an element in a list
+        tape = [x for x in tape]
+
+        # Checks for tape
+        for letter in tape:
+            assert((letter in alphabet) or (letter == "_"))
+
+        # For debugging purposes
+        # print(" Tape : ", ''.join(tape))
+
+        # Close file
+        f.close()
+
+        return tape
+
+    # In case of inability to open or read file 
+    except IOError as e: 
+        # print(" " + e)
+        sys.exit(3)
+
+    # Improperly written tape file 
+    except:
+        print("input error")
+        sys.exit(2)
+
+
+"""
+This function performs the TM simulation using the information gathered 
+from the description file and the tape, if provided. 
+"""
+def simulateTM(states: set, initialState: str, transitionDict: dict, tape: list[str]) -> None:
+
+    # Reaffirming variable type - Python seems to have loose typing of variables 
+    tape = list(tape)
+
+    currentState = initialState
+
+    movementDict = {"L": -1, "R": 1, "N": 0}
+    print(" Start state: ", currentState)
+    currentPosition = 0
+    steps = 0
+
+    while True:
+        if currentPosition == len(tape):
+            tape.extend(repeat("_", 100))
+
+        if ((currentState, tape[currentPosition]) not in transitionDict):
+            print("not accepted")
+            print(steps)
+            finaltape = ''.join(tape).rstrip("_")
+            if finaltape == "": finaltape = "_"
+            print(finaltape)
+            sys.exit(1)
+
+        else:
+            info = transitionDict[(currentState, tape[currentPosition])]
+            currentState = info[0]
+            tape[currentPosition] = info[1]
+            currentPosition += movementDict[info[2]]
+ 
+
+        # NOTE: DISABLE PRINT TAPE FOR SPEED TEST!
+        if ((currentState, "+") in states):
+            print("accepted")
+            print(steps)
+            finaltape = ''.join(tape).rstrip("_")
+            if finaltape == "": finaltape = "_"
+            print(finaltape)
+            result = 1
+            sys.exit(0)
+        
+        if ((currentState, "-") in states):
+            print("not accepted")
+            print(steps)
+            finaltape = ''.join(tape).rstrip("_")
+            if finaltape == "": finaltape = "_"
+            print(finaltape)
+            sys.exit(1)
+
+        steps += 1
+
+        if currentPosition < 0:
+            currentPosition = 0
+
+main()
