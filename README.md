@@ -4,6 +4,4 @@ I designed and developed my TM simulator in Python, developed Turing Machines to
 
   ![Screenshot from 2024-06-17 20-14-44](https://github.com/davidkennedy02/TuringMachines/assets/82157860/3fe5bf25-b228-41fa-9c06-696f5393bc5a)
 
-Read my report here: 
-
-[Turing_Machines.pdf](https://github.com/user-attachments/files/15875874/Turing_Machines.pdf)
+Read my report here: [Turing_Machines.pdf](https://github.com/user-attachments/files/15875874/Turing_Machines.pdf)
